@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>LinkedIn AI Scheduler</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --navy: #0a0f1e;
+    --navy-mid: #111827;
+    --navy-light: #1a2540;
+    --navy-border: #1e2d4a;
+    --cream: #f0e6d3;
+    --cream-dim: #b8a99a;
+    --gold: #c9a84c;
+    --gold-light: #e2c47a;
+    --gold-dim: #7a6030;
+    --green: #2ecc8a;
+    --red: #e05c5c;
+    --white: #ffffff;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--navy);
+    color: var(--cream);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 80% 50% at 20% 10%, rgba(201,168,76,0.06) 0%, transparent 60%),
+      radial-gradient(ellipse 60% 40% at 80% 80%, rgba(10,30,80,0.4) 0%, transparent 60%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .app { position: relative; z-index: 1; max-width: 860px; margin: 0 auto; padding: 40px 24px 80px; }
+
+  .header { text-align: center; margin-bottom: 52px; animation: fadeUp 0.8s ease both; }
+  .header-eyebrow { font-size: 11px; letter-spacing: 0.25em; text-transform: uppercase; color: var(--gold); margin-bottom: 14px; font-weight: 500; }
+  .header h1 { font-family: 'Playfair Display', serif; font-size: clamp(2rem, 5vw, 3rem); font-weight: 700; color: var(--cream); line-height: 1.15; margin-bottom: 12px; }
+  .header h1 span { color: var(--gold); }
+  .header p { color: var(--cream-dim); font-size: 15px; font-weight: 300; max-width: 480px; margin: 0 auto; line-height: 1.7; }
+
+  .card { background: var(--navy-mid); border: 1px solid var(--navy-border); border-radius: 16px; padding: 32px; margin-bottom: 20px; animation: fadeUp 0.7s ease both; transition: border-color 0.3s; }
+  .card:hover { border-color: rgba(201,168,76,0.2); }
+  .card-title { font-family: 'Playfair Display', serif; font-size: 18px; font-weight: 600; color: var(--cream); margin-bottom: 6px; display: flex; align-items: center; gap: 10px; }
+  .card-title .num { width: 24px; height: 24px; border-radius: 50%; background: rgba(201,168,76,0.15); border: 1px solid var(--gold-dim); display: flex; align-items: center; justify-content: center; font-size: 11px; color: var(--gold); font-family: 'DM Sans', sans-serif; flex-shrink: 0; }
+  .card-sub { font-size: 13px; color: var(--cream-dim); margin-bottom: 24px; margin-left: 34px; }
+
+  .field { margin-bottom: 18px; }
+  .field label { display: block; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--cream-dim); margin-bottom: 8px; font-weight: 500; }
+  .field input, .field textarea, .field select { width: 100%; background: var(--navy-light); border: 1px solid var(--navy-border); border-radius: 10px; padding: 12px 16px; color: var(--cream); font-family: 'DM Sans', sans-serif; font-size: 14px; outline: none; transition: border-color 0.3s, box-shadow 0.3s; }
+  .field input:focus, .field textarea:focus, .field select:focus { border-color: var(--gold-dim); box-shadow: 0 0 0 3px rgba(201,168,76,0.08); }
+  .field input::placeholder, .field textarea::placeholder { color: #3a4a65; }
+  .field select { cursor: pointer; }
+  .field select option { background: var(--navy-mid); }
+  .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+  .input-wrap { position: relative; }
+  .input-wrap input { padding-right: 44px; }
+  .toggle-eye { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--cream-dim); cursor: pointer; font-size: 16px; padding: 4px; transition: color 0.2s; }
+  .toggle-eye:hover { color: var(--gold); }
+
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 13px 24px; border-radius: 10px; font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 500; cursor: pointer; border: none; transition: all 0.25s ease; letter-spacing: 0.02em; }
+  .btn-gold { background: linear-gradient(135deg, var(--gold), #a8802a); color: var(--navy); box-shadow: 0 4px 20px rgba(201,168,76,0.25); }
+  .btn-gold:hover { transform: translateY(-1px); box-shadow: 0 6px 28px rgba(201,168,76,0.35); }
+  .btn-outline { background: transparent; color: var(--cream); border: 1px solid var(--navy-border); }
+  .btn-outline:hover { border-color: var(--gold-dim); color: var(--gold); }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none !important; }
+  .btn-full { width: 100%; }
+
+  .spinner { width: 16px; height: 16px; border: 2px solid rgba(10,15,30,0.3); border-top-color: var(--navy); border-radius: 50%; animation: spin 0.7s linear infinite; display: none; }
+  .loading .spinner { display: block; }
+  .loading .btn-text { display: none; }
+
+  .mode-toggle { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+  .mode-btn { padding: 14px; border-radius: 10px; border: 1px solid var(--navy-border); background: var(--navy-light); color: var(--cream-dim); cursor: pointer; text-align: center; transition: all 0.25s; font-family: 'DM Sans', sans-serif; }
+  .mode-btn .mode-icon { font-size: 20px; display: block; margin-bottom: 6px; }
+  .mode-btn .mode-title { font-size: 13px; font-weight: 500; display: block; margin-bottom: 2px; }
+  .mode-btn .mode-desc { font-size: 11px; color: var(--cream-dim); }
+  .mode-btn.selected { border-color: var(--gold); background: rgba(201,168,76,0.08); color: var(--cream); }
+
+  .schedule-field { display: none; }
+  .schedule-field.visible { display: block; animation: fadeUp 0.3s ease; }
+
+  .toast { position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--navy-mid); border: 1px solid var(--navy-border); border-radius: 12px; padding: 14px 22px; font-size: 14px; color: var(--cream); display: flex; align-items: center; gap: 10px; box-shadow: 0 8px 40px rgba(0,0,0,0.5); opacity: 0; transition: all 0.4s cubic-bezier(0.34,1.56,0.64,1); z-index: 1000; white-space: nowrap; }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .toast.success { border-color: rgba(46,204,138,0.4); }
+  .toast.error { border-color: rgba(224,92,92,0.4); }
+  .toast-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .toast.success .toast-dot { background: var(--green); }
+  .toast.error .toast-dot { background: var(--red); }
+
+  .posts-list { display: flex; flex-direction: column; gap: 12px; margin-top: 20px; }
+  .post-item { background: var(--navy-light); border: 1px solid var(--navy-border); border-radius: 12px; padding: 18px 20px; transition: border-color 0.3s; }
+  .post-item:hover { border-color: rgba(201,168,76,0.2); }
+  .post-item-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .post-status { font-size: 11px; padding: 3px 10px; border-radius: 20px; font-weight: 500; letter-spacing: 0.05em; text-transform: uppercase; }
+  .status-pending { background: rgba(201,168,76,0.15); color: var(--gold); }
+  .status-posted { background: rgba(46,204,138,0.15); color: var(--green); }
+  .status-failed { background: rgba(224,92,92,0.15); color: var(--red); }
+  .post-time { font-size: 12px; color: var(--cream-dim); }
+  .post-content-preview { font-size: 13px; color: var(--cream-dim); line-height: 1.6; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+  .section { display: none; }
+  .section.active { display: block; }
+
+  .nav { display: flex; gap: 4px; margin-bottom: 36px; background: var(--navy-mid); border: 1px solid var(--navy-border); border-radius: 12px; padding: 5px; animation: fadeUp 0.8s 0.1s ease both; }
+  .nav-btn { flex: 1; padding: 10px; border-radius: 8px; border: none; background: transparent; color: var(--cream-dim); font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.25s; display: flex; align-items: center; justify-content: center; gap: 6px; }
+  .nav-btn.active { background: var(--navy-light); color: var(--cream); box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+
+  .editable-post { width: 100%; background: var(--navy-light); border: 1px solid rgba(201,168,76,0.3); border-radius: 12px; padding: 20px; color: var(--cream); font-family: 'DM Sans', sans-serif; font-size: 14px; line-height: 1.75; outline: none; resize: vertical; min-height: 200px; transition: border-color 0.3s, box-shadow 0.3s; }
+  .editable-post:focus { border-color: var(--gold-dim); box-shadow: 0 0 0 3px rgba(201,168,76,0.08); }
+
+  .preview-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 14px; }
+  .char-count { font-size: 12px; color: var(--cream-dim); }
+  .char-count.over { color: var(--red); }
+
+  .gold-line { width: 40px; height: 2px; background: linear-gradient(90deg, var(--gold), transparent); margin: 0 auto 20px; border-radius: 2px; }
+
+  .empty-state { text-align: center; padding: 48px 20px; color: var(--cream-dim); font-size: 14px; }
+  .empty-state .empty-icon { font-size: 36px; margin-bottom: 12px; opacity: 0.4; }
+
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <div class="header-eyebrow">Powered by Llama via Groq</div>
+    <div class="gold-line"></div>
+    <h1>LinkedIn <span>AI</span> Scheduler</h1>
+    <p>Generate, preview and publish thoughtful posts to your LinkedIn — automatically.</p>
+  </div>
+
+  <div class="nav">
+    <button class="nav-btn active" onclick="showSection('compose')" id="nav-compose"><span>✦</span> Compose</button>
+    <button class="nav-btn" onclick="showSection('posts')" id="nav-posts"><span>◈</span> My Posts</button>
+    <button class="nav-btn" onclick="showSection('settings')" id="nav-settings"><span>◎</span> Settings</button>
+  </div>
+
+  <!-- COMPOSE -->
+  <div class="section active" id="section-compose">
+    <div class="card" style="animation-delay:0.1s">
+      <div class="card-title"><span class="num">1</span> Your Credentials</div>
+      <div class="card-sub">Stored only in your browser session — never sent anywhere except LinkedIn and Groq.</div>
+      <div class="field">
+        <label>LinkedIn Access Token</label>
+        <div class="input-wrap">
+          <input type="password" id="li-token" placeholder="Paste your LinkedIn token here..."/>
+          <button class="toggle-eye" onclick="togglePass('li-token', this)">👁</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>Groq API Key</label>
+        <div class="input-wrap">
+          <input type="password" id="groq-key" placeholder="gsk_..."/>
+          <button class="toggle-eye" onclick="togglePass('groq-key', this)">👁</button>
+        </div>
+      </div>
+      <button class="btn btn-outline" onclick="verifyProfile()" id="verify-btn">
+        <span class="spinner"></span><span class="btn-text">Verify LinkedIn Token</span>
+      </button>
+      <div id="profile-banner" style="margin-top:14px; font-size:13px; display:none;"></div>
+    </div>
+
+    <div class="card" style="animation-delay:0.2s">
+      <div class="card-title"><span class="num">2</span> Generate Your Post</div>
+      <div class="card-sub">Tell Llama what to write — then edit it to match your voice.</div>
+      <div class="field">
+        <label>Topic</label>
+        <input type="text" id="topic" placeholder="e.g. Why agentic AI is the next big shift for developers in 2026"/>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>Tone</label>
+          <select id="tone">
+            <option value="professional">Professional</option>
+            <option value="conversational">Conversational</option>
+            <option value="thought-provoking">Thought-provoking</option>
+            <option value="storytelling">Storytelling</option>
+            <option value="educational">Educational</option>
+          </select>
+        </div>
+        <div class="field" style="display:flex; align-items:flex-end;">
+          <button class="btn btn-gold btn-full" onclick="generatePost()" id="gen-btn">
+            <span class="spinner"></span><span class="btn-text">✦ Generate with Llama</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="animation-delay:0.3s">
+      <div class="card-title"><span class="num">3</span> Preview & Edit</div>
+      <div class="card-sub">Your generated post appears below. Edit freely before publishing.</div>
+      <textarea class="editable-post" id="post-content" placeholder="Your generated post will appear here. You can edit it before posting..." oninput="updateCharCount()"></textarea>
+      <div class="preview-actions">
+        <div class="char-count" id="char-count">0 / 3000 characters</div>
+        <button class="btn btn-outline" onclick="clearPost()" style="padding:8px 14px; font-size:12px;">Clear</button>
+      </div>
+    </div>
+
+    <div class="card" style="animation-delay:0.4s">
+      <div class="card-title"><span class="num">4</span> Publish</div>
+      <div class="card-sub">Post immediately or schedule for the perfect moment.</div>
+      <div class="mode-toggle">
+        <div class="mode-btn selected" onclick="selectMode('now')" id="mode-now">
+          <span class="mode-icon">⚡</span>
+          <span class="mode-title">Post Now</span>
+          <span class="mode-desc">Publish immediately</span>
+        </div>
+        <div class="mode-btn" onclick="selectMode('schedule')" id="mode-schedule">
+          <span class="mode-icon">◷</span>
+          <span class="mode-title">Schedule</span>
+          <span class="mode-desc">Pick a date and time</span>
+        </div>
+      </div>
+      <div class="schedule-field" id="schedule-field">
+        <div class="field-row">
+          <div class="field"><label>Date</label><input type="date" id="sched-date"/></div>
+          <div class="field"><label>Time (your local time)</label><input type="time" id="sched-time"/></div>
+        </div>
+      </div>
+      <button class="btn btn-gold btn-full" onclick="publishPost()" id="publish-btn" style="margin-top:4px;">
+        <span class="spinner"></span><span class="btn-text">Publish to LinkedIn</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- POSTS -->
+  <div class="section" id="section-posts">
+    <div class="card">
+      <div class="card-title" style="margin-bottom:4px;">My Posts</div>
+      <div class="card-sub" style="margin-left:0;">All your scheduled and published posts.</div>
+      <button class="btn btn-outline" onclick="loadPosts()" id="load-btn">
+        <span class="spinner"></span><span class="btn-text">Refresh Posts</span>
+      </button>
+      <div id="posts-container">
+        <div class="empty-state"><div class="empty-icon">◈</div>Click refresh to load your posts</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SETTINGS -->
+  <div class="section" id="section-settings">
+    <div class="card">
+      <div class="card-title" style="margin-bottom:4px;">How to Get Your Keys</div>
+      <div class="card-sub" style="margin-left:0;">Quick setup guide.</div>
+      <div style="display:flex; flex-direction:column; gap:16px; margin-top:8px;">
+        <div style="background:var(--navy-light); border-radius:10px; padding:18px; border:1px solid var(--navy-border);">
+          <div style="font-size:13px; font-weight:500; color:var(--gold); margin-bottom:8px;">LinkedIn Access Token</div>
+          <div style="font-size:13px; color:var(--cream-dim); line-height:1.7;">1. Go to linkedin.com/developers/apps<br/>2. Enable "Share on LinkedIn" product<br/>3. Go to linkedin.com/developers/tools/oauth/token-generator<br/>4. Select app → check all scopes → Request token</div>
+        </div>
+        <div style="background:var(--navy-light); border-radius:10px; padding:18px; border:1px solid var(--navy-border);">
+          <div style="font-size:13px; font-weight:500; color:var(--gold); margin-bottom:8px;">Groq API Key (Free)</div>
+          <div style="font-size:13px; color:var(--cream-dim); line-height:1.7;">1. Go to console.groq.com<br/>2. Sign up for free<br/>3. API Keys → Create API Key<br/>4. Copy and paste above</div>
+        </div>
+        <div style="background:var(--navy-light); border-radius:10px; padding:18px; border:1px solid var(--navy-border);">
+          <div style="font-size:13px; font-weight:500; color:var(--gold); margin-bottom:8px;">Backend URL</div>
+          <div class="field" style="margin-bottom:0; margin-top:10px;">
+            <input type="text" id="backend-url" value="http://127.0.0.1:8000"/>
+          </div>
+          <div style="font-size:12px; color:var(--cream-dim); margin-top:8px;">Change this when you deploy to the cloud.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"><div class="toast-dot"></div><span id="toast-msg"></span></div>
+
+<script>
+  const API = () => document.getElementById('backend-url')?.value || 'http://127.0.0.1:8000';
+  let currentMode = 'now';
+
+  const now = new Date(); now.setHours(now.getHours() + 1);
+  document.getElementById('sched-date').value = now.toISOString().split('T')[0];
+  document.getElementById('sched-time').value = now.toTimeString().slice(0,5);
+
+  function showSection(name) {
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('section-' + name).classList.add('active');
+    document.getElementById('nav-' + name).classList.add('active');
+    if (name === 'posts') loadPosts();
+  }
+
+  function togglePass(id, btn) {
+    const el = document.getElementById(id);
+    el.type = el.type === 'password' ? 'text' : 'password';
+    btn.textContent = el.type === 'password' ? '👁' : '🙈';
+  }
+
+  function selectMode(mode) {
+    currentMode = mode;
+    document.getElementById('mode-now').classList.toggle('selected', mode === 'now');
+    document.getElementById('mode-schedule').classList.toggle('selected', mode === 'schedule');
+    document.getElementById('schedule-field').classList.toggle('visible', mode === 'schedule');
+    document.getElementById('publish-btn').querySelector('.btn-text').textContent =
+      mode === 'now' ? 'Publish to LinkedIn' : 'Schedule Post';
+  }
+
+  function updateCharCount() {
+    const len = document.getElementById('post-content').value.length;
+    const el = document.getElementById('char-count');
+    el.textContent = `${len} / 3000 characters`;
+    el.classList.toggle('over', len > 3000);
+  }
+
+  function clearPost() {
+    document.getElementById('post-content').value = '';
+    updateCharCount();
+  }
+
+  function showToast(msg, type = 'success') {
+    const t = document.getElementById('toast');
+    document.getElementById('toast-msg').textContent = msg;
+    t.className = `toast ${type} show`;
+    setTimeout(() => t.classList.remove('show'), 3500);
+  }
+
+  function setLoading(btnId, loading) {
+    const btn = document.getElementById(btnId);
+    btn.classList.toggle('loading', loading);
+    btn.disabled = loading;
+  }
+
+  async function verifyProfile() {
+    const token = document.getElementById('li-token').value.trim();
+    if (!token) return showToast('Please enter your LinkedIn token', 'error');
+    setLoading('verify-btn', true);
+    try {
+      const res = await fetch(`${API()}/profile`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ linkedin_token: token }) });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Verification failed');
+      const banner = document.getElementById('profile-banner');
+      banner.style.display = 'block';
+      banner.innerHTML = `<span style="color:var(--green)">✓ Connected as <strong style="color:var(--cream)">${data.name}</strong></span>`;
+      showToast(`Verified as ${data.name}`);
+    } catch(e) { showToast(e.message, 'error'); }
+    setLoading('verify-btn', false);
+  }
+
+  async function generatePost() {
+    const groqKey = document.getElementById('groq-key').value.trim();
+    const topic = document.getElementById('topic').value.trim();
+    const tone = document.getElementById('tone').value;
+    if (!groqKey) return showToast('Please enter your Groq API key', 'error');
+    if (!topic) return showToast('Please enter a topic', 'error');
+    setLoading('gen-btn', true);
+    try {
+      const res = await fetch(`${API()}/generate`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ groq_api_key: groqKey, topic, tone }) });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Generation failed');
+      document.getElementById('post-content').value = data.content;
+      updateCharCount();
+      showToast('Post generated — edit it to match your voice');
+    } catch(e) { showToast(e.message, 'error'); }
+    setLoading('gen-btn', false);
+  }
+
+  async function publishPost() {
+    const token = document.getElementById('li-token').value.trim();
+    const content = document.getElementById('post-content').value.trim();
+    if (!token) return showToast('Please enter your LinkedIn token', 'error');
+    if (!content) return showToast('Please generate or write a post first', 'error');
+    let body = { linkedin_token: token, content, post_now: currentMode === 'now' };
+    if (currentMode === 'schedule') {
+      const date = document.getElementById('sched-date').value;
+      const time = document.getElementById('sched-time').value;
+      if (!date || !time) return showToast('Please pick a date and time', 'error');
+      const localDt = new Date(`${date}T${time}:00`);
+      body.scheduled_time = localDt.toISOString().slice(0,19);
+    }
+    setLoading('publish-btn', true);
+    try {
+      const res = await fetch(`${API()}/schedule`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Publish failed');
+      if (data.status === 'posted') { showToast('Post published to LinkedIn!'); clearPost(); }
+      else { showToast(`Scheduled for ${new Date(data.scheduled_time).toLocaleString()}`); clearPost(); }
+    } catch(e) { showToast(e.message, 'error'); }
+    setLoading('publish-btn', false);
+  }
+
+  async function loadPosts() {
+    const token = document.getElementById('li-token').value.trim();
+    if (!token) return showToast('Enter your LinkedIn token in Compose first', 'error');
+    setLoading('load-btn', true);
+    try {
+      const res = await fetch(`${API()}/posts`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ linkedin_token: token }) });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Failed to load');
+      renderPosts(data.posts || []);
+    } catch(e) { showToast(e.message, 'error'); }
+    setLoading('load-btn', false);
+  }
+
+  function renderPosts(posts) {
+    const container = document.getElementById('posts-container');
+    if (!posts.length) { container.innerHTML = `<div class="empty-state"><div class="empty-icon">◈</div>No posts yet. Compose your first one!</div>`; return; }
+    container.innerHTML = `<div class="posts-list">${posts.map(p => `
+      <div class="post-item">
+        <div class="post-item-header">
+          <span class="post-status status-${p.status}">${p.status}</span>
+          <span class="post-time">${p.status === 'posted' && p.posted_at ? 'Posted ' + new Date(p.posted_at).toLocaleString() : 'Scheduled ' + new Date(p.scheduled_time).toLocaleString()}</span>
+        </div>
+        <div class="post-content-preview">${p.content.replace(/</g,'&lt;')}</div>
+      </div>`).join('')}</div>`;
+  }
+</script>
+</body>
+</html>
